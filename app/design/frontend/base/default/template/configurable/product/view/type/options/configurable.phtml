@@ -1,0 +1,150 @@
+<?php
+$_product    = $this->getProduct();
+$_attributes = Mage::helper('core')->decorateArray($this->getAllowAttributes());
+?>
+<?php // size guide
+$size_guide_template = $_product->getAttributeText('size_guide_template'); 
+$size_guide_template_block = "size_guide_" . str_replace(array(" ", "-"), array("_", "_"), strtolower($size_guide_template));
+$size_guide = $this->getLayout()->createBlock('cms/block')->setBlockId($size_guide_template_block)->toHtml();
+
+//callback for default
+if ($size_guide) {
+	$size_guide_template_block = "size_guide_default";
+	$size_guide = $this->getLayout()->createBlock('cms/block')->setBlockId($size_guide_template_block)->toHtml();
+}
+?>
+
+<?php $configs = $this->getRegularConfig()?>
+<?php foreach($configs['attributes'] as $config):?>
+	<dt><label><?php echo $this->__("Select "); ?><?php echo $config['label'] ?>:</label></dt>	
+	<dd class="<?php echo $config['code'] ?> clearfix" data-label="<?php echo $config['label'] ?>">
+	<ul>
+	<?php foreach($config['options'] as $value):?>
+		<?php 
+		$code = str_replace(" / ", "-", strtolower($value['label']));
+		$code = str_replace(" ", "-", $code);
+		$code = str_replace("/", "-", $code);
+		$products = "";
+		foreach ($value['products'] as $key => $_value): 
+			$products .= $_value.',';
+		endforeach;
+		$products = rtrim($products, ',');
+		?>
+
+        <li class="<?php echo $code; ?>">
+        <label class="label-radio-configurable" data-price="<?php echo (float)$value['price'] + (float) $_product->getPrice();?>">
+        	<span class="title"><?php echo $value['label'] ?></span>
+        <input type="radio" name="super_attribute[<?php echo $config['id'] ?>]"
+				id="attribute<?php echo $config['id'] ?>"
+				class="validate-custom-configurable"
+				value="<?php echo $value['id']?>"
+				data-products="<?php echo $products; ?>" />
+        <?php echo $value['label']?> 
+        <?php /* 
+        (+ $<?php printf("%.2f", $value['price'])?>) 
+        */ ?>
+        </label>
+		
+			
+		
+		</li>
+	<?php endforeach;?>
+	<?php if($config['code'] == 'size' && $size_guide) : ?>
+		<li class="size-guide">
+			<a href="#size-guide" id="size-guider"><span class="ic arr-right"><?php echo $this->__("Size Guide"); ?></span></a>
+		</li>
+	<?php endif; ?>
+	</ul>
+	</dd>
+	<dt class="clear"></dt>
+<?php endforeach;?>
+
+<?php if ($size_guide) ?>  <div id="size-guide" class="jq-dialog"><?php echo $size_guide ?></div>
+    <script type="text/javascript">
+        var spConfig = new Product.Config(<?php echo $this->getJsonConfig() ?>);
+		document.observe("dom:loaded", function() {
+			var customValidation = false;
+			var priceFormat = <?php echo $this->helper('tax')->getPriceFormat(); ?>;
+			$$('.validate-custom-configurable').each(function(el){
+				el.observe('click',function(event){
+					// console.log(el.parentNode);
+					$$('span .price').each(function(elmn){
+						// + jQuery fix
+						elmn.update(formatCurrency(parseFloat(jQuery(el.parentNode).data('price')), priceFormat)).innerHTML;
+					});
+				});
+			});
+			Validation.addAllThese([
+				['validate-custom-configurable', 'This is a required field.', function(v) {
+					$$('.validate-custom-configurable').each(function(el){
+						if (el.checked) {
+							customValidation = true;
+						}
+					});
+					return customValidation;
+				}]
+			]);
+		});
+		jQuery(function($) {			
+			$(".color .label-radio-configurable input").on('change', function(e) {
+				var self = $(this),
+					allowed = self.data('products');
+
+				$(".size .label-radio-configurable input").each(function(i,v) {
+					var self = $(this),
+						allowedHaystack = self.data('products').toString(),
+						allow = -1;
+					if (allow < 0) {
+						if (typeof allowed == 'number') {
+							allow = allowedHaystack.search(allowed);
+						} else {
+							allowedAr = allowed.split(',');
+							allowedAr.each(function(v,i) {
+								if (allow < 0) {
+									allow = allowedHaystack.search(v);	
+								}
+								
+							})
+						}	
+					}
+					self.removeAttr('disabled');
+					self.parent().parent().removeClass('disabled')
+					if (allow < 0) {
+						self.attr('disabled', 'disabled');
+						self.removeAttr('checked');
+						self.parent().parent().removeClass('active').addClass('disabled');
+					}	
+				})
+			})
+			$(".label-radio-configurable").on('click', function(e) {
+				var self = $(this),
+					parent = self.parent(),
+					parents = parent.siblings(),
+					resetSelf = $("label",parents)
+					input = $("input", self);
+
+					validateAttributes();
+					
+					if (!input.is(':disabled')) {
+						parents.removeClass('active');
+						parent.addClass('active');	
+					}
+					
+
+			})
+
+			// size guide
+			var size_guider = $("#size-guider"),
+				size_guide = $("#size-guide");
+
+			size_guide.dialog({
+				width: 800,
+				title: '<?php echo $this->__("Size Guide"); ?>'
+			})
+			size_guider.on('click', function(e) {
+				size_guide.dialog('open');
+				e.preventDefault();
+			})
+
+		})
+    </script>
